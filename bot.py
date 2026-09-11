@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Emberlamp Bot - Automation script for emberlamp organization
+Coccinella Labs Bot - Automation script for coccinella-labs organization
 """
 
 import os
@@ -8,12 +8,12 @@ import json
 import subprocess
 from datetime import datetime
 
-ORG = "emberlamp"
-CONFIG_REPO = "emberlamp/config"
-REPOS_JSON_URL = "https://raw.githubusercontent.com/emberlamp/config/main/repos.json"
+ORG = "coccinella-labs"
+CONFIG_REPO = "coccinella-labs/config"
+REPOS_JSON_URL = "https://raw.githubusercontent.com/coccinella-labs/config/main/repos.json"
 
 
-class EmberlampBot:
+class CoccinellaBot:
     def __init__(self):
         self.token = os.environ.get("GH_TOKEN")
         if not self.token:
@@ -37,8 +37,8 @@ class EmberlampBot:
 
     def get_github_repos(self):
         """Get all repos from GitHub"""
-        output = self.run(f"gh api orgs/{ORG}/repos --jq '.[].name'")
-        return output.strip().split("\n") if output else []
+        output = self.run(f"gh api orgs/{ORG}/repos --paginate --jq '.[].name'")
+        return [r for r in output.strip().split("\n") if r] if output.strip() else []
 
     def sync(self):
         """Sync repos from config to GitHub"""
@@ -80,10 +80,10 @@ class EmberlampBot:
 def main():
     import sys
 
-    bot = EmberlampBot()
+    bot = CoccinellaBot()
 
     if len(sys.argv) < 2:
-        print("Usage: emberlamp-bot <command>")
+        print("Usage: bot <command>")
         print("Commands: sync, list, update <command>")
         sys.exit(1)
 
@@ -95,7 +95,7 @@ def main():
         bot.list_repos()
     elif cmd == "update":
         if len(sys.argv) < 3:
-            print("Usage: emberlamp-bot update <command>")
+            print("Usage: bot update <command>")
             sys.exit(1)
         bot.update_all(sys.argv[2])
     else:

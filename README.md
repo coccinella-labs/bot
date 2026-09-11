@@ -2,13 +2,13 @@
   <img src="https://raw.githubusercontent.com/Coccinella-Labs/bot/main/.github/assets/thumbnail.png" alt="bot" width="100%">
 </p>
 
-# Emberlamp Auto Bot
+# Coccinella Labs Auto Bot
 
-Automation bot for managing emberlamp organization repositories.
+Automation bot for managing coccinella-labs organization repositories.
 
 ## Overview
 
-This bot provides automated tasks for the emberlamp organization through GitHub Actions workflows that run automatically or on-demand.
+This bot provides automated tasks for the coccinella-labs organization through GitHub Actions workflows that run automatically or on-demand.
 
 ## Features
 
@@ -39,7 +39,7 @@ The workflow runs automatically every day at midnight.
 
 ### Manual Trigger
 
-1. Go to https://github.com/emberlamp/bot/actions
+1. Go to https://github.com/coccinella-labs/bot/actions
 2. Click "Run workflow"
 3. Select action: sync, update, backup, or report
 
@@ -89,6 +89,6 @@ Config Repo (repos.json)
 
 ## Repositories Managed
 
-See [emberlamp/config/repos.json](https://github.com/emberlamp/config/blob/main/repos.json)
+See [coccinella-labs/config/repos.json](https://github.com/coccinella-labs/config/blob/main/repos.json)
 
-Total: 14 repositories
+Managed repos are defined by the config repo (currently 14 in the managed subset).

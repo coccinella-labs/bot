@@ -1,4 +1,4 @@
-name: Emberlamp Auto Bot
+name: Coccinella Labs Auto Bot
 
 on:
   # Trigger on schedule (daily at midnight)
@@ -24,7 +24,7 @@ on:
           - report
 
 env:
-  ORG: emberlamp
+  ORG: coccinella-labs
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
@@ -35,8 +35,21 @@ jobs:
       pull-requests: write
       actions: write
     steps:
+      - name: Get App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout bot repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      - name: Export token
+        run: echo "GH_TOKEN=${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
       - name: Fetch repos from config
         id: config
@@ -48,9 +61,10 @@ jobs:
       - name: Get current GitHub repos
         id: github
         run: |
-          echo "github_repos=$(gh api orgs/${{ env.ORG }}/repos --jq '.[].name' | tr '\n' ',')" >> $GITHUB_OUTPUT
+          gh api "orgs/${{ env.ORG }}/repos" --paginate --jq '.[].name' > github_repos.txt
+          echo "github_repos=$(tr '\n' ',' < github_repos.txt)" >> $GITHUB_OUTPUT
           echo "Current repos on GitHub:"
-          gh api orgs/${{ env.ORG }}/repos --jq '.[].name' | sed 's/^/  - /'
+          sed 's/^/  - /' github_repos.txt
 
       - name: Compare repos
         run: |
@@ -77,16 +91,25 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.email "bot@emberlamp.github"
-          git config user.name "Emberlamp Bot"
-          git remote set-url origin "https://$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          APP_SLUG="${{ steps.app-token.outputs.app-slug }}"
+          if [ -z "$APP_SLUG" ]; then APP_SLUG="coccinella-bot"; fi
+          # Same format as harper's bot: <bot-id>+<slug>[bot]@users.noreply.github.com
+          BOT_ID="$(gh api "users/$APP_SLUG[bot]" --jq .id 2>/dev/null || true)"
+          if [ -n "$BOT_ID" ]; then
+            git config user.name "$APP_SLUG[bot]"
+            git config user.email "$BOT_ID+$APP_SLUG[bot]@users.noreply.github.com"
+          else
+            git config user.name "coccinella-labs-bot[bot]"
+            git config user.email "327906963+coccinella-labs-bot[bot]@users.noreply.github.com"
+          fi
+          git remote set-url origin "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
 
       - name: Create sync report PR
         if: github.event_name == 'workflow_dispatch'
         run: |
           CONFIG_SORTED=$(echo "${{ steps.config.outputs.config_repos }}" | tr ',' '\n' | grep -v '^$' | sort | tr '\n' ' ')
           GITHUB_SORTED=$(echo "${{ steps.github.outputs.github_repos }}" | tr ',' '\n' | grep -v '^$' | sort | tr '\n' ' ')
-          echo "# Emberlamp Sync Report - $(date +%Y-%m-%d)" > sync-report.md
+          echo "# Coccinella Labs Sync Report - $(date +%Y-%m-%d)" > sync-report.md
           echo "" >> sync-report.md
           echo "Config repos: $CONFIG_SORTED" >> sync-report.md
           echo "GitHub repos: $GITHUB_SORTED" >> sync-report.md
@@ -96,7 +119,7 @@ jobs:
           gh pr create \
             --head sync-report \
             --title "Auto Sync Report $(date +%Y-%m-%d)" \
-            --body "Automated sync report from emberlamp bot" \
+            --body "Automated sync report from coccinella-labs bot" \
             --base main \
             || echo "PR already exists or no changes"
 
@@ -108,7 +131,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout bot
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Get repos list
         run: |
@@ -145,19 +168,19 @@ jobs:
       - name: Create backup archive
         run: |
           mkdir -p backup
-          REPOS=$(gh api orgs/${{ env.ORG }}/repos --jq '.[].name')
+          REPOS=$(gh api "orgs/${{ env.ORG }}/repos" --paginate --jq '.[].name')
           for repo in $REPOS; do
             echo "Cloning $repo..."
             git clone --mirror "https://github.com/${{ env.ORG }}/$repo.git" "backup/$repo.git"
           done
-          tar -czf emberlamp-backup-$(date +%Y%m%d).tar.gz backup/
-          echo "Backup created: emberlamp-backup-$(date +%Y%m%d).tar.gz"
+          tar -czf coccinella-backup-$(date +%Y%m%d).tar.gz backup/
+          echo "Backup created: coccinella-backup-$(date +%Y%m%d).tar.gz"
 
       - name: Upload backup
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: emberlamp-backup
-          path: emberlamp-backup-*.tar.gz
+          name: coccinella-backup
+          path: coccinella-backup-*.tar.gz
 
   auto-update-trigger:
     runs-on: ubuntu-latest
@@ -176,28 +199,56 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Get App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout bot repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      - name: Export token
+        run: echo "GH_TOKEN=${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
       - name: Configure git
         run: |
-          git config user.email "bot@emberlamp.github"
-          git config user.name "Emberlamp Bot"
+          APP_SLUG="${{ steps.app-token.outputs.app-slug }}"
+          if [ -z "$APP_SLUG" ]; then APP_SLUG="coccinella-bot"; fi
+          # Same format as harper's bot: <bot-id>+<slug>[bot]@users.noreply.github.com
+          BOT_ID="$(gh api "users/$APP_SLUG[bot]" --jq .id 2>/dev/null || true)"
+          if [ -n "$BOT_ID" ]; then
+            git config user.name "$APP_SLUG[bot]"
+            git config user.email "$BOT_ID+$APP_SLUG[bot]@users.noreply.github.com"
+          else
+            git config user.name "coccinella-labs-bot[bot]"
+            git config user.email "327906963+coccinella-labs-bot[bot]@users.noreply.github.com"
+          fi
 
       - name: Generate daily report
         run: |
-          echo "📊 Daily Emberlamp Report - $(date +%Y-%m-%d)"
+          set -euo pipefail
+          echo "📊 Daily Coccinella Labs Report - $(date +%Y-%m-%d)"
           echo ""
-          echo "Repositories: $(gh api orgs/${{ env.ORG }}/repos --jq 'length')"
+          REPO_COUNT=$(gh api "orgs/${{ env.ORG }}/repos" --paginate --jq '.[].name' | wc -l | tr -d ' ')
+          if ! echo "$REPO_COUNT" | grep -Eq '^[0-9]+$'; then
+            echo "::error::Failed to list repos for org ${{ env.ORG }}: $REPO_COUNT"
+            exit 1
+          fi
+          echo "Repositories: $REPO_COUNT"
           echo ""
           echo "Public repos:"
-          gh api orgs/${{ env.ORG }}/repos --jq '.[] | select(.visibility == "public") | .name' | sed 's/^/  - /'
+          gh api "orgs/${{ env.ORG }}/repos" --paginate --jq '.[] | select(.visibility == "public") | .name' | sed 's/^/  - /'
           echo ""
           echo "Private repos:"
-          gh api orgs/${{ env.ORG }}/repos --jq '.[] | select(.visibility == "private") | .name' | sed 's/^/  - /'
-          
+          gh api "orgs/${{ env.ORG }}/repos" --paginate --jq '.[] | select(.visibility == "private") | .name' | sed 's/^/  - /'
+
           # Commit report
-          echo "- $(date): $(gh api orgs/${{ env.ORG }}/repos --jq 'length') repos" >> history.md
+          echo "- $(date): $REPO_COUNT repos" >> history.md
           git add -A
           git commit -m "docs: daily report $(date +%Y-%m-%d)" || true
           git push || true
